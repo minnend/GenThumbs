@@ -141,73 +141,14 @@ public class GenThumbs
     return ret;
   }
 
-  /** Original version of downscaling routine based on multiple steps of 2x downscaling. */
-  protected boolean convertV1(WorkItem work)
-  {
-    String sQuality = "";
-    if (work.getQuality() > 0) sQuality = "-quality " + work.getQuality();
-    Dimension dimThumb = work.getThumbDim();
-    Dimension dimOrig = work.getOrigDim();
-    String sResampleGoal = work.getResampleGoal();
-
-    double[] steps = computeSteps(dimOrig, dimThumb);
-    // System.out.printf("[%d x %d] -> [%d x %d]: ", dimOrig.width, dimOrig.height, dimThumb.width, dimThumb.height);
-    // for(int i=0; i<steps.length; i++) System.out.printf(" %.3f", steps[i]);
-    // System.out.println();
-
-    // compute max bounding box
-    double sw = dimThumb.width;
-    double sh = dimThumb.height;
-    for (int i = 0; i < steps.length; i++) {
-      sw *= steps[i];
-      sh *= steps[i];
-    }
-
-    double sigma1 = 0.5, sigma2 = 0.2;
-    if (sResampleGoal == "Sharp") {
-      sigma1 = 1.1;
-      sigma2 = 0.5;
-    } else if (sResampleGoal == "Sharper") {
-      sigma1 = 1.5;
-      sigma2 = 0.75;
-    }
-
-    String cmd = String.format("convert \"%s\" -filter lanczos2sharp", work.getSrc().getAbsolutePath());
-    for (int i = 0; i < steps.length; i++) {
-      double sigma = ((double) (i + 1) / steps.length < 0.7) ? sigma1 : sigma2;
-      sw /= steps[i];
-      sh /= steps[i];
-      if (sResampleGoal != "Smooth" && (i > 0 || steps.length < 2)) cmd += String.format(" -unsharp 0x%.2f", sigma);
-      cmd += String.format(" %s %dx%d", (work.getStripMeta() && i == 0) ? "-thumbnail" : "-resize",
-          (int) Math.round(sw), (int) Math.round(sh));
-    }
-    cmd += String.format(" %s \"%s\"", sQuality, work.getDst().getAbsolutePath());
-
-    String[] cmda = new String[3];
-    if (bWindows) {
-      cmda[0] = "cmd";
-      cmda[1] = "/c";
-      cmda[2] = cmd;
-    } else {
-      cmda = new String[3];
-      cmda[0] = "/bin/bash";
-      cmda[1] = "-c";
-      cmda[2] = cmd;
-    }
-
-    System.out.printf("cmd: [%s]\n", cmd);
-    runner.run(cmda);
-    return (runner.getExitCode() == 0);
-  }
-
   /** Downscale image followed by unsharp mask. */
   protected boolean convert(WorkItem work)
   {
     Dimension dimThumb = work.getThumbDim();
     String sResampleGoal = work.getResampleGoal();
 
-    String cmd = String.format("convert \"%s\" -filter lanczos2sharp -resize %dx%d", work.getSrc().getAbsolutePath(),
-        (int) Math.round(dimThumb.getWidth()), (int) Math.round(dimThumb.getHeight()));
+    String cmd = String.format("magick convert \"%s\" -filter lanczos2sharp -resize \"%dx%d>\"",
+        work.getSrc().getAbsolutePath(), (int) Math.round(dimThumb.getWidth()), (int) Math.round(dimThumb.getHeight()));
 
     if (sResampleGoal != "Smooth") {
       double sigma = 0.5, strength = 0.2;
